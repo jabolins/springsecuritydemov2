@@ -14,6 +14,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 @Configuration
 @EnableWebSecurity
@@ -33,7 +34,20 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .anyRequest()
                 .authenticated()
                 .and()
-                .httpBasic();
+                // nomainām nākošo rindiņu httpBasic (tā pieļauj pamata aturizēšanos) pret speciālizēto formu (formLogin)
+//                .httpBasic()
+                .formLogin()
+                .loginPage("/auth/login").permitAll() // obligāti jānorāda ka visiem ir piekļuve šai lapai
+                .defaultSuccessUrl("/auth/index")
+                //nākošās 7 rindiņas ir lai izveidotu drošu izlogošanos. Lai metode ir tikai POST. Lai notīra visus datus un atbilstošo coocies. Tās ir svarīgas!!!!
+                .and()
+                .logout()
+                .logoutRequestMatcher(new AntPathRequestMatcher("/auth/logout", "POST"))
+                .invalidateHttpSession(true)
+                .clearAuthentication(true)
+                .deleteCookies("JSESSIONID")
+                .logoutSuccessUrl("/aut/login")
+        ;
     }
 
     @Bean // norādam lai būtu piekļuve ne dažādām vietām
