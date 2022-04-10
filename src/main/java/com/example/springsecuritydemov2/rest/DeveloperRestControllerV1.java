@@ -1,6 +1,7 @@
 package com.example.springsecuritydemov2.rest;
 
 import com.example.springsecuritydemov2.model.Developer;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,6 +25,7 @@ public class DeveloperRestControllerV1 {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('developers:read')") //šādi nosakām pilnvaras piekļuve
     public Developer getById(@PathVariable Long id) {
         return ALL_DEVElOPERS.stream().filter(developer -> developer.getId() == id)
                 .findFirst()
@@ -31,14 +33,16 @@ public class DeveloperRestControllerV1 {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('developers:write')")
     public Developer create(@RequestBody Developer developer) {
         this.ALL_DEVElOPERS.add(developer);
         return developer;
     }
 
     @DeleteMapping("/{id}")
-    public void deleteById(@PathVariable Long id){
-this.ALL_DEVElOPERS.removeIf(developer -> developer.getId()==id);
+    @PreAuthorize("hasAuthority('developer:write')")
+    public void deleteById(@PathVariable Long id) {
+        this.ALL_DEVElOPERS.removeIf(developer -> developer.getId() == id);
     }
 
 }

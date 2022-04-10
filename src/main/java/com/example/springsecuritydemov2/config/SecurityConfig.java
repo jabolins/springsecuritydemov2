@@ -5,6 +5,7 @@ import com.example.springsecuritydemov2.model.Role;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
@@ -16,6 +17,7 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 
 @Configuration
 @EnableWebSecurity
+@EnableGlobalMethodSecurity(prePostEnabled = true)// tas vajadzīgs lai controllierī norādītu authorizācijas (piekļuves) līmeņus ar @PreAuthorize
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     @Override // šo izvēlējāmies no overraide metodēm. Un tā kā strdājam ar HHTP tad izvēlamies tieši šo.
@@ -24,18 +26,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 // nākošā rindiņa nosaka aizsardzību no csrf (spring security piedāvā to defoltā
                 .csrf().disable()
                 .authorizeRequests()
-               // .antMatchers("/").permitAll() // antMatchers noska konkrēti kādām lapām kādas piekļuves. Šobrīd izņēmu ārā lai pie level2 var piekļūt tikai admin
-
-                // šādi (nākošās 3 rindiņas) bija uzrakstīts līdz izveidojām Permissions.
-//                .antMatchers(HttpMethod.GET, "/api/**").hasAnyRole(Role.ADMIN.name(), Role.USER.name())
-//                .antMatchers(HttpMethod.POST, "/api/**").hasRole(Role.ADMIN.name())
-//                .antMatchers(HttpMethod.DELETE, "/api/**").hasRole(Role.ADMIN.name())
-                // pārtaisām iepriekšējās 3 rindiņas šādi izmantojot izveidotos permission
-                .antMatchers(HttpMethod.GET, "/api/**").hasAuthority(Permission.DEVELOPERS_READ.getPermission())
-                .antMatchers(HttpMethod.POST, "/api/**").hasAuthority(Permission.DEVELOPERS_WRITE.getPermission())
-                .antMatchers(HttpMethod.DELETE, "/api/**").hasAuthority(Permission.DEVELOPERS_WRITE.getPermission())
-
-
+                //visām lapām kas atrakstītas controller izmantojam @PreAuthorize. Tā kā lapas level2 un index nav nevienā kontrolierī tad aprakstām šādi
                 .antMatchers("/level2.html").hasAuthority(Permission.DEVELOPERS_WRITE.getPermission())// šo pieliku es tikai pārbaudei par piekļuves tiesībām
                 .antMatchers("/index.html").hasAuthority(Permission.DEVELOPERS_READ.getPermission())// šo pieliku es pārbaudei lai nodalītu index un level2
                 // nākošās divas rindiņas nosaka ka katram pieprasījumam jābut autorizētam
