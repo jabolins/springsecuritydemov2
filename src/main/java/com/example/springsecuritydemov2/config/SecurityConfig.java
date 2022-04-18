@@ -1,101 +1,56 @@
 package com.example.springsecuritydemov2.config;
 
-import com.example.springsecuritydemov2.model.Permission;
-import com.example.springsecuritydemov2.model.Role;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
+import com.example.springsecuritydemov2.security.JwtConfigurer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 @Configuration
 @EnableWebSecurity
-@EnableGlobalMethodSecurity(prePostEnabled = true)// tas vajadzīgs lai controllierī norādītu authorizācijas (piekļuves) līmeņus ar @PreAuthorize
+@EnableGlobalMethodSecurity(prePostEnabled = true)
+// tas vajadzīgs lai controllierī norādītu authorizācijas (piekļuves) līmeņus ar @PreAuthorize
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
-    private final UserDetailsService userDetailsService; // to mums vismas pagaidām vajag priekš zemāk metodes daoAuthenticationProvider. Un ieliekam uzreiz konstruktorā
-    @Autowired
-    public SecurityConfig(@Qualifier("userDetailsServiceImpl") UserDetailsService userDetailsService) { // @Qualifire nāk no klases userDetailsServiceImpl
-        this.userDetailsService = userDetailsService;
+    public SecurityConfig(JwtConfigurer jwtConfigurer) {
+        this.jwtConfigurer = jwtConfigurer;
     }
+
+    private final JwtConfigurer jwtConfigurer;
 
     @Override // šo izvēlējāmies no overraide metodēm. Un tā kā strdājam ar HHTP tad izvēlamies tieši šo.
     protected void configure(HttpSecurity http) throws Exception {
         http
                 // nākošā rindiņa nosaka aizsardzību no csrf (spring security piedāvā to defoltā
                 .csrf().disable()
+                .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)// norādam jo vairāk neizmantosim sesijsas bet piekļuvi ar jwt token
+                .and()
                 .authorizeRequests()
                 //visām lapām kas atrakstītas controller izmantojam @PreAuthorize. Tā kā lapas level2 un index nav nevienā kontrolierī tad aprakstām šādi
-                .antMatchers("/level2.html").hasAuthority(Permission.DEVELOPERS_WRITE.getPermission())// šo pieliku es tikai pārbaudei par piekļuves tiesībām
-                .antMatchers("/index.html").hasAuthority(Permission.DEVELOPERS_READ.getPermission())// šo pieliku es pārbaudei lai nodalītu index un level2
+                .antMatchers("/").permitAll() // pamatlapai varēs piekļūt visi
+                .antMatchers("/api/v1/auth/login").permitAll()
                 // nākošās divas rindiņas nosaka ka katram pieprasījumam jābut autorizētam
                 .anyRequest()
                 .authenticated()
                 .and()
-                // nomainām nākošo rindiņu httpBasic (tā pieļauj pamata aturizēšanos) pret speciālizēto formu (formLogin)
-//                .httpBasic()
-                .formLogin()
-                .loginPage("/auth/login").permitAll() // obligāti jānorāda ka visiem ir piekļuve šai lapai
-                .defaultSuccessUrl("/auth/index")
-                //nākošās 7 rindiņas ir lai izveidotu drošu izlogošanos. Lai metode ir tikai POST. Lai notīra visus datus un atbilstošo coocies. Tās ir svarīgas!!!!
-                .and()
-                .logout()
-                .logoutRequestMatcher(new AntPathRequestMatcher("/auth/logout", "POST"))
-                .invalidateHttpSession(true)
-                .clearAuthentication(true)
-                .deleteCookies("JSESSIONID")
-                .logoutSuccessUrl("/aut/login")
-        ;
-    }
-
-    @Bean // norādam lai būtu piekļuve ne dažādām vietām
-    @Override // arī šo mēs pievinojam no overraide metodēm lai varētu izmantot nevis standarta security user/password bet mūsu norādītos.
-    protected UserDetailsService userDetailsService() {
-        return new InMemoryUserDetailsManager( // ar šādas rindas palīdzību mēs izveidojam jaunu lietotāju ar paroli, lietotājvārdu un tiesībām (tiesības defoltās)
-                User.builder()
-                        .username("admin")
-                        .password(passwordEncoder().encode("admin"))
-                        //šādi (nākošā rindiņa) bija pirms izveidojām Permissions
-//                        .roles(Role.ADMIN.name())
-                        //pārveidojām iepriekšējo rindiņu izmantojot permissions
-                        .authorities(Role.ADMIN.getAuthorities())
-                        .build(),
-                User.builder()
-                        .username("user")
-                        .password(passwordEncoder().encode("user"))
-                        .authorities((Role.USER.getAuthorities()))
-                        .build()
-        );
-    }
-
-    @Override
-    protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-        auth.authenticationProvider(daoAuthenticationProvider()); // šādi norādam ka būs mūsu zemāk minētais autentifikātors
+                .apply(jwtConfigurer); // nosaku ka autentifikācija notiks arjwtConfigurer klases palidzību
     }
 
     @Bean
-    protected PasswordEncoder passwordEncoder(){
+    @Override
+    public AuthenticationManager authenticationManagerBean() throws Exception {
+        return super.authenticationManagerBean();
+    }
+
+    @Bean
+    protected PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(12); // nosaka cik "spēcīgai" jābūt šifrēšanai
     }
 
-    @Bean
-    protected DaoAuthenticationProvider daoAuthenticationProvider(){
-        DaoAuthenticationProvider daoAuthenticationProvider = new DaoAuthenticationProvider();
-        daoAuthenticationProvider.setPasswordEncoder(passwordEncoder());
-        daoAuthenticationProvider.setUserDetailsService(userDetailsService);
-        return daoAuthenticationProvider;
-
-    }
 }
